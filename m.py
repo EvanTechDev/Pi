@@ -14,6 +14,11 @@ STATE = "state.pkl"
 C = 640320
 C3_OVER_24 = C ** 3 // 24
 
+# Larger chunks reduce the number of expensive state snapshots while keeping
+# memory usage reasonable for long-running computations.
+BLOCK_SIZE = 200
+CHECKPOINT_EVERY = 8
+
 def verify_state():
     if not os.path.exists(STATE):
         print("state.pkl not found")
@@ -141,7 +146,7 @@ def bs(a, b):
 
 def save_state(state):
     with open(STATE, "wb") as f:
-        pickle.dump(state, f)
+        pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def load_state():
@@ -166,8 +171,6 @@ def calculate(add_digits):
     old_terms = current // 14 + 1
     new_terms = target // 14 + 1
 
-    block = 20
-
     print(
         f"current {current} digits"
     )
@@ -179,10 +182,11 @@ def calculate(add_digits):
     start = time.time()
 
     try:
+        blocks_done = 0
         while index < new_terms:
 
             end = min(
-                index + block,
+                index + BLOCK_SIZE,
                 new_terms
             )
 
@@ -196,16 +200,22 @@ def calculate(add_digits):
                 Q = Q*q
 
             index = end
+            blocks_done += 1
 
-            save_state(
-                (
-                    target,
-                    index,
-                    P,
-                    Q,
-                    T
-                )
+            should_save = (
+                blocks_done % CHECKPOINT_EVERY == 0
+                or index >= new_terms
             )
+            if should_save:
+                save_state(
+                    (
+                        target,
+                        index,
+                        P,
+                        Q,
+                        T
+                    )
+                )
 
             progress(
                 index-old_terms,
