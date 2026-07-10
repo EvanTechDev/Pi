@@ -1,0 +1,59 @@
+name: Run Python Script and Update Release (gh CLI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: 'Number of iterations'
+        required: false
+        default: '50000000'
+      block_size:
+        description: 'Block size'
+        required: false
+        default: '6500'
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Download files from latest release
+      run: |
+        gh release download latest \
+          -R EvanTechDev/Pi \
+          -p "output.txt" \
+          -p "state.pkl"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Install dependencies
+      run: |
+        pip install gmpy2
+    
+    - name: Run Python script
+      run: |
+        python m.py --${{ github.event.inputs.iterations || '50000000' }} --block-size=${{ github.event.inputs.block_size || '6500' }}
+    
+    - name: Update release assets
+      run: |
+        # 删除旧的assets
+        gh release delete-asset latest output.txt -y || true
+        gh release delete-asset latest state.pkl -y || true
+        
+        # 上传新的assets
+        gh release upload latest output.txt --clobber
+        gh release upload latest state.pkl --clobber
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
