@@ -88,9 +88,16 @@ def async_save_state(state):
 
 def save_state_sync(state):
     temp = STATE + ".tmp"
-    with open(temp, "wb") as f:
-        pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
-    os.replace(temp, STATE)
+    try:
+        with open(temp, "wb") as f:
+            pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(temp, STATE)
+    except Exception as e:
+        print(f"Warning: Failed to save state: {e}")
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
 
 def load_state():
     if not os.path.exists(STATE):
